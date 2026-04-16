@@ -1203,3 +1203,48 @@ Some notes for bandit30 of bandit.
 ```
 
 -> Password: `qp30ex3VLz5MDG1n91YowTv4Q8l7CDZL`
+
+# Level 30 -> Level 31
+
+Có 1 git repo tại: `ssh://bandit30-git@bandit.labs.overthewire.org:2220/home/bandit30-git/repo` qua port `2220`. Mật khẩu cho người dùng `bandit30-git` giống mật khẩu người dùng `bandit30`
+
+Từ máy local của bạn, clone repo và tìm mật khẩu cho level tiếp theo
+
+---
+
+*Note*:
+
+**Git tag** là một cách để đánh dấu các điểm cụ thể trong lịch sử của repo. 
+
+Một ví dụ là đánh dấu các điểm phát hành của phần mềm. 
+
+Lệnh để xem các thẻ là `git tag`. 
+
+Để tạo một thẻ, lệnh là `git tag -a <tag_name> -m <"mô tả/thông báo của thẻ">`. 
+
+Để xem thêm chi tiết, chẳng hạn như thông báo của thẻ và commit, bạn có thể sử dụng lệnh sau: `git show <tag_name>`.
+
+---
+
+Tương tự bài trước, tạo 1 folder, clone git repo và kiểm tra nội dung bên trong
+
+```
+$ cat README.md
+just an epmty file... muahaha
+```
+
+file `README.md` không cho ta bất cứ thông tin gì. Kiểm tra git tag, ta tìm được 1 điểm trong lịch sử gọi là `secret`
+
+```
+$ git tag
+secret
+```
+
+Xem chi tiết tag này:
+
+```
+$ git show secret
+fb5S2xb7bRyFmAvQYQGEqsbhVyJqhnDy
+```
+
+-> Password: `fb5S2xb7bRyFmAvQYQGEqsbhVyJqhnDy`
