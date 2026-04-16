@@ -882,3 +882,324 @@ The password of user bandit25 is iCi86ttT4KSNe1armKiwbQNmB3YJP3q4
 
 -> Password: `iCi86ttT4KSNe1armKiwbQNmB3YJP3q4`
 
+# Level 25 -> Level 26
+
+Đăng nhập vào bandit26 từ bandit25, Shell dành cho người dùng bandit26 không phải là `/bin/bash` , mà là một thứ khác. Hãy tìm hiểu xem đó là gì, cách hoạt động của nó và cách thoát khỏi nó.
+
+Mỗi người dùng có một `shell` mặc định. Điều này đặc biệt quan trọng khi sử dụng ssh, vì đây là shell sẽ được hiển thị. Thông tin về shell mặc định của người dùng có thể được tìm thấy ở cuối dòng dành cho người dùng trong tệp `/etc/passwd`.
+
+Lệnh `more` là một lệnh shell cho phép hiển thị các tệp ở chế độ tương tác. Cụ thể, chế độ tương tác này chỉ hoạt động khi nội dung của tệp quá lớn để hiển thị đầy đủ trong cửa sổ terminal. Một lệnh được cho phép trong chế độ tương tác là `v`. Lệnh này sẽ mở tệp trong trình soạn thảo ‘vim’.
+
+Vim là một trình soạn thảo văn bản. Nó cũng cho phép bạn chạy các lệnh shell. Có thể sử dụng vim để thoát khỏi môi trường bị hạn chế và tạo ra một shell mới. Để tạo shell mặc định của người dùng, lệnh `:shell` được sử dụng. Để thay đổi shell thành ‘/bin/bash’, lệnh là `:set shell=/bin/sh`.
+
+Sau khi đăng nhập từ `bandit25`, tiến hành kiểm tra shell của `bandit26`: `cat /etc/passwd | grep bandit26`
+
+Kết quả cho thấy shell của `bandit26` không phải `/bin/bash` mà là `usr/bin/showtext`
+
+```
+bandit25@bandit:~$ cat /etc/passwd | grep bandit26
+bandit26:x:11026:11026:bandit level 26:/home/bandit26:/usr/bin/showtext
+```
+
+Tiến hành xem thử nội dung file:
+
+```
+bandit25@bandit:~$ cat /usr/bin/showtext
+#!/bin/sh
+
+export TERM=linux
+
+exec more ~/text.txt
+exit 0
+```
+
+- Khi đang nhập, hệ thống sẽ chạy chương trình `more`
+- Người dùng bị giới hạn trong chế độ xem file, không có shell tương tác (`bash`)
+
+Tiếp theo, khi ta nhìn vào thư mục chính của user hiện tại, ta tìm được 1 private ssh key. Ta có thể copy-paste key này vào một file trong máy và set quyền cho nó. Sau đó sử dụng key này để login vào `bandit26`
+
+```
+bandit25@bandit:~$ ls
+bandit26.sshkey
+
+$ touch bandit26.sshkey
+$ nano bandit26.sshkey
+$ chmod 700 bandit26.sshkey
+$ ssh -i bandit26.sshkey bandit26@bandit.labs.overthewire.org -p 2220
+```
+
+Khi login vào, ta thấy connection bị đóng lại bởi vì `usr/bin/showtext` thực thi
+
+```
+$ ssh -i bandit26.sshkey bandit26@localhost
+...
+  _                     _ _ _   ___   __  
+ | |                   | (_) | |__ \ / /  
+ | |__   __ _ _ __   __| |_| |_   ) / /_  
+ | '_ \ / _` | '_ \ / _` | | __| / / '_ \ 
+ | |_) | (_| | | | | (_| | | |_ / /| (_) |
+ |_.__/ \__,_|_| |_|\__,_|_|\__|____\___/ 
+Connection to bandit.labs.overthewire.org closed.
+```
+
+Vì `text.txt` có thể hiển thị hết trong 1 màn hình, `more` sẽ không phải chuyển sang chế độ command/interactive mode và sẽ thoát luôn.
+
+Nếu ta làm cho màn hình terminal nhỏ hơn, `more` sẽ chuyển sang chế độ command. Từ đây, ta có thể dùng `v` để vào `vim`.
+
+Trong `vi`, thực hiện:
+
+```
+:set shell=/bin/bash
+:shell
+```
+
+- `:set shell=/bin/bash`: đặt shell mặc định là bash
+- `:shell`: mở shell mới
+
+-> Giờ ta có thể truy cập được shell đầy đủ
+
+Cuối cùng, lấy password: `cat /etc/bandit_pass/bandit26`
+
+-> Password: `s0773xxkk0MXfdqOfPRVr9L3jJBUOgCZ`
+
+-> Đây là ví dụ điển hình của restricted shell bypass
+
+# Level 26 -> Level 27
+
+Sau khi có được quyền truy cập shell, chúng ta có thể tìm thấy một tệp có tên `bandit27-do` trong thư mục chính của bandit26. Tên tệp cho thấy đó chính là thứ chúng ta cần kiểm tra.
+
+```
+bandit26@bandit:~$ ls -la
+total 44
+drwxr-xr-x   3 root     root      4096 Apr  3 15:17 .
+drwxr-xr-x 150 root     root      4096 Apr  3 15:20 ..
+-rwsr-x---   1 bandit27 bandit26 14888 Apr  3 15:17 bandit27-do
+-rw-r--r--   1 root     root       220 Mar 31  2024 .bash_logout
+-rw-r--r--   1 root     root      3851 Apr  3 15:10 .bashrc
+-rw-r--r--   1 root     root       807 Mar 31  2024 .profile
+drwxr-xr-x   2 root     root      4096 Apr  3 15:17 .ssh
+-rw-r-----   1 bandit26 bandit26   258 Apr  3 15:17 text.txt
+```
+
+Đây là một **setuid binary**. Khi thực thi, chương trình sẽ chạy với quyền của owner (`bandit27`)
+
+Chạy thử chương trình và khai thác
+
+```
+bandit26@bandit:~$ ./bandit27-do whoami
+bandit27
+bandit26@bandit:~$ ./bandit27-do cat /etc/bandit_pass/bandit27
+upsNCc7vzaRDx6oZC6GiR6ERwe1MowGB
+```
+
+-> Password: `upsNCc7vzaRDx6oZC6GiR6ERwe1MowGB`
+
+# Level 27 -> Level 28
+
+Có 1 git repo tại: `ssh://bandit27-git@bandit.labs.overthewire.org:2220/home/bandit27-git/repo` qua port `2220`. Mật khẩu cho người dùng `bandit27-git` giống mật khẩu người dùng `bandit27`
+
+Từ máy local của bạn, clone repo và tìm mật khẩu cho level tiếp theo
+
+--- 
+*Note*:
+
+“Git là một hệ thống kiểm soát phiên bản phân tán, mã nguồn mở và miễn phí” - https://git-scm.com/. Nó cho phép bạn lưu mã nguồn, cũng như lịch sử và các thay đổi bạn đã thực hiện. Nó cũng giúp việc cộng tác và làm việc nhóm trên cùng một mã nguồn trở nên đơn giản hơn.
+
+Hệ thống Git chứa rất nhiều lệnh. Một số lệnh thiết yếu nhất là:
+
+`git init`, để tạo một kho lưu trữ/dự án Git mới
+
+`git clone`, để sao chép một kho lưu trữ git hiện có
+
+`git push`, cập nhật kho lưu trữ từ xa
+
+`git pull`, nhận cập nhật từ kho lưu trữ từ xa. Bạn cũng có thể sử dụng một ứng dụng khách Git có giao diện đồ họa (GUI) để tương tác dễ dàng hơn (https://git-scm.com/downloads/guis).
+
+Nhiều dịch vụ khác nhau cung cấp cho bạn cách để lưu trữ kho lưu trữ của mình từ xa (công khai hoặc riêng tư). Nếu bạn quan tâm đến mã nguồn mở, đây thường cũng là nơi để tải phần mềm hoặc đóng góp. Những dịch vụ nổi tiếng nhất là Github và GitLab.
+
+Thư mục ‘.git’ chứa tất cả thông tin cần thiết cho việc kiểm soát phiên bản. Nó chứa thông tin về các commit, địa chỉ kho lưu trữ từ xa, nhật ký và nhiều hơn nữa.
+
+Tệp README thường được tìm thấy trong kho lưu trữ Git. Nó được sử dụng như một bản tổng quan về tất cả các tệp trong một thư mục hoặc dự án Git. Khi tạo một dự án Git, tệp README rất hữu ích để nhớ dự án đó nói về điều gì, cũng như các thông tin khác mà người dùng và nhà phát triển có thể cần. Ví dụ: một lời giải thích ngắn gọn về dự án, hướng dẫn cấu hình và cài đặt, thông tin cấp phép, v.v.
+
+---
+
+Đầu tiên, tạo 1 thư mục tạm và clone nó:
+
+```
+$ mktemp -d
+/tmp/tmp.cnY0ylV7LF
+$ cd /tmp/tmp.cnY0ylV7LF
+$ git clone ssh://bandit27-git@bandit.labs.overthewire.org:2220/home/bandit27-git/repo
+```
+
+Kiểm tra nội dung:
+```
+$ ls
+repo
+$ cd repo
+$ ls
+README
+$ cat README
+The password to the next level is: Yz9IpL0sBcCeuG7m9uQFt8ZNpS4HZRcN
+```
+
+-> Password: `Yz9IpL0sBcCeuG7m9uQFt8ZNpS4HZRcN`
+
+# Level 28 -> Level 29
+
+Có 1 git repo tại: `ssh://bandit28-git@bandit.labs.overthewire.org:2220/home/bandit28-git/repo` qua port `2220`. Mật khẩu cho người dùng `bandit28-git` giống mật khẩu người dùng `bandit28`
+
+Từ máy local của bạn, clone repo và tìm mật khẩu cho level tiếp theo
+
+---
+
+*Note*:
+
+Ở cấp độ này, chúng ta cần biết thêm hai lệnh:
+
+`git log`, hiển thị nhật ký commit.
+
+`git show <commit>`, hiển thị nội dung của một commit (Khi tạo kho lưu trữ công khai, điều quan trọng là phải nhận thức được thông tin bạn đẩy lên đó vì các thay đổi và phiên bản trước đó được lưu lại. Vì vậy, dữ liệu nhạy cảm, như mật khẩu, vẫn có thể bị truy xuất).
+
+---
+
+Từ máy local của bạn, clone repo và tìm mật khẩu cho level tiếp theo
+
+Thực hiện clone tương tự như bài trước
+
+Kiểm tra nội dung:
+
+```
+$ ls
+README.md
+$ cat README.md
+# Bandit Notes
+Some notes for level29 of bandit.
+
+## credentials
+
+- username: bandit29
+- password: xxxxxxxxxx
+```
+
+-> Password đã bị che lại, có khả năng password thật đã từng tồn tại trong repo
+
+Ta có thể xem lịch sử git để xem các version trước của file `README.md` có chứa mật khẩu hay không
+
+Đầu tiên, kiểm tra log của git
+
+```
+$ git log
+commit adc7f885a129baee883058b8a870739489f80194 (HEAD -> master, origin/master, origin/HEAD)
+Author: Morla Porla <morla@overthewire.org>
+Date:   Fri Apr 3 15:17:54 2026 +0000
+
+    fix info leak
+
+commit a3437bddd447f2d496731658e86b98cbea9d3c98
+Author: Morla Porla <morla@overthewire.org>
+Date:   Fri Apr 3 15:17:54 2026 +0000
+
+    add missing data
+
+commit cb630ec182b75bc289595511f8bcf4d47cfec50d
+Author: Ben Dover <noone@overthewire.org>
+Date:   Fri Apr 3 15:17:54 2026 +0000
+
+    initial commit of README.md
+```
+
+Một commit có mô tả `fix info leak`. Ta có thể xem những thay đổi nào đã được thực hiện
+
+```
+$ git show adc7f885a129baee883058b8a870739489f80194
+commit adc7f885a129baee883058b8a870739489f80194 (HEAD -> master, origin/master, origin/HEAD)
+Author: Morla Porla <morla@overthewire.org>
+Date:   Fri Apr 3 15:17:54 2026 +0000
+
+    fix info leak
+
+diff --git a/README.md b/README.md
+index d4e3b74..5c6457b 100644
+--- a/README.md
++++ b/README.md
+@@ -4,5 +4,5 @@ Some notes for level29 of bandit.
+ ## credentials
+
+ - username: bandit29
+-- password: 4pT1t5DENaYuqnqvadYs1oE4QLCdjmJ7
++- password: xxxxxxxxxx
+```
+-> Trong commit này, ta thấy password thật đã bị che lại trong commit mới
+
+-> Password: `4pT1t5DENaYuqnqvadYs1oE4QLCdjmJ7`
+
+# Level 29 -> Level 30
+
+Có 1 git repo tại: `ssh://bandit29-git@bandit.labs.overthewire.org:2220/home/bandit29-git/repo` qua port `2220`. Mật khẩu cho người dùng `bandit29-git` giống mật khẩu người dùng `bandit29`
+
+Từ máy local của bạn, clone repo và tìm mật khẩu cho level tiếp theo
+
+---
+
+*Note*:
+
+**Git branch** là một tính năng khác của hệ thống quản lý phiên bản. Nó cho phép bạn chia quá trình phát triển thành các nhánh khác nhau. 
+
+Cụ thể, có một nhánh chính (master) từ đó phần mềm có thể được lấy ra và được phát triển riêng biệt. Bạn có thể thay đổi và thêm các tính năng trong khi vẫn duy trì nhánh chính đang hoạt động. Sau khi hoàn thành công việc, nó có thể được tích hợp lại vào nhánh chính. Điều này cho phép kiểm soát phiên bản tốt hơn. Bạn có thể cung cấp một nhánh sản xuất với phần mềm có thể sử dụng được, trong khi sửa lỗi hoặc thêm tính năng trong một nhánh phát triển khác.
+
+Các lệnh cơ bản để làm việc với các nhánh là:
+
+`git branch`: Liệt kê (`-a`), tạo hoặc xóa nhánh
+
+`git checkout <branch_name>/git switch <branch_name>`: Chuyển đổi nhánh
+
+`git merge`: Kết hợp hai hoặc nhiều nhánh
+
+---
+
+Tương tự bài trước, tạo 1 folder, clone git repo và kiểm tra nội dung bên trong
+
+```
+$ cat README.md
+# Bandit Notes
+Some notes for bandit30 of bandit.
+
+## credentials
+
+- username: bandit30
+- password: <no passwords in production!>
+```
+
+Câu `<no passwords in production!>` nghe có vẻ có nhiều branch.
+
+Ta thử liệt kê toàn bộ branch:
+
+```
+git branch -a
+* master
+  remotes/origin/HEAD -> origin/master
+  remotes/origin/dev
+  remotes/origin/master
+  remotes/origin/sploits-dev
+```
+
+Ta thu được 1 list các branch của repo này. Bây giờ, ta checkout các branch này
+
+```
+$ git checkout dev
+branch 'dev' set up to track 'origin/dev'.
+Switched to a new branch 'dev'
+$ ls
+code  README.md
+$ cat README.md
+# Bandit Notes
+Some notes for bandit30 of bandit.
+
+## credentials
+
+- username: bandit30
+- password: qp30ex3VLz5MDG1n91YowTv4Q8l7CDZL
+```
+
+-> Password: `qp30ex3VLz5MDG1n91YowTv4Q8l7CDZL`
